@@ -13,7 +13,7 @@ import (
 
 const Address = "10.5.0.1/16"
 const MTU = 1500
-const Debug = true
+const Debug = false
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -71,10 +71,11 @@ func main() {
 				continue
 			}
 			frame = frame[:n]
-			log.Printf("%s -> %s\n", frame.Source(), frame.Destination())
+			if Debug {
+				log.Printf("%s -> %s\n", frame.Source(), frame.Destination())
+			}
 
 			if conn, ok := clients[frame.Destination().String()]; ok {
-				log.Println("passing to client", conn.RemoteAddr().String())
 				err := conn.WriteMessage(websocket.BinaryMessage, frame)
 				if err != nil {
 					log.Println("write message:", err)
@@ -82,7 +83,6 @@ func main() {
 				}
 			} else if frame.Destination().String() == "ff:ff:ff:ff:ff:ff" {
 				for _, client := range clients {
-					log.Println("passing to client", client.RemoteAddr().String())
 					err := client.WriteMessage(websocket.BinaryMessage, frame)
 					if err != nil {
 						log.Println("write message:", err)
@@ -108,7 +108,7 @@ func handle(wr http.ResponseWriter, req *http.Request) {
 	}
 	defer c.Close()
 
-	log.Println("connected!")
+	log.Println("connected!", c.RemoteAddr().String())
 
 	var addr net.HardwareAddr
 	defer func() {
@@ -125,7 +125,9 @@ func handle(wr http.ResponseWriter, req *http.Request) {
 		}
 
 		frame := ethernet.Frame(message)
-		log.Printf("%s -> %s\n", frame.Source(), frame.Destination())
+		if Debug {
+			log.Printf("%s -> %s\n", frame.Source(), frame.Destination())
+		}
 		if addr == nil {
 			addr = frame.Source()
 			clients[addr.String()] = c
